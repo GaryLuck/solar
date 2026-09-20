@@ -257,6 +257,24 @@ nav{
 #banner.bad{background:#ffd9d9;color:#5b1111}
 .conf{position:fixed;width:11px;height:14px;border-radius:3px;z-index:50;pointer-events:none}
 
+#startgate{
+  position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  padding:24px;text-align:center;
+  background:radial-gradient(120% 90% at 50% 10%, #1b2a66 0%, #0a1030 50%, #05070f 100%);
+  transition:opacity .35s ease;
+}
+#startgate.gone{opacity:0;pointer-events:none}
+.gatecard{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:420px}
+.gatesun{width:min(42vw,160px);height:min(42vw,160px)}
+.gatecard h2{margin:0;font-size:clamp(26px,8vw,40px);line-height:1.1}
+.gatecard h2 .em{color:#ffd34d}
+#gateBtn{font-size:clamp(20px,6vw,26px);padding:18px 30px}
+.gatenote{
+  margin:4px 0 0;font-size:14px;line-height:1.5;color:#b9c6ef;max-width:30em;
+  background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.12);
+  border-radius:14px;padding:10px 14px;
+}
+.gatenote b{color:#ffd34d}
 #assets{position:absolute;width:0;height:0;overflow:hidden}
 @media (prefers-reduced-motion: reduce){
   #stars .star{animation:none;opacity:.6}
@@ -335,6 +353,15 @@ nav{
   <button class="navbtn" data-screen="find"><span class="ico">&#128269;</span>Find It!</button>
   <button class="navbtn" data-screen="order"><span class="ico">&#127919;</span>In Order</button>
 </nav>
+
+<div id="startgate">
+  <div class="gatecard">
+    <svg class="gatesun" id="gateSun" viewBox="-72 -72 144 144" aria-hidden="true"></svg>
+    <h2>Our <span class="em">Solar System</span></h2>
+    <button class="bigbtn" id="gateBtn">&#128640; Tap to start</button>
+    <p class="gatenote" id="gateNote"></p>
+  </div>
+</div>
 
 <div id="scrim"></div>
 <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="cardName">
@@ -585,19 +612,55 @@ function planetSVG(b, r, uid){
    ========================================================= */
 var soundOn = true, audioCtx = null, voice = null;
 
+var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 function ac(){
   if(!audioCtx){
     try{ var AC = window.AudioContext || window.webkitAudioContext; audioCtx = AC ? new AC() : null; }
     catch(e){ audioCtx = null; }
   }
-  if(audioCtx && audioCtx.state === "suspended"){ try{ audioCtx.resume(); }catch(e){} }
+  if(audioCtx && audioCtx.state !== "running"){ try{ audioCtx.resume(); }catch(e){} }
   return audioCtx;
 }
+
+/* iPhones and iPads keep the web audio engine asleep until a real finger
+   touches the page, and by default they silence it when the side switch is
+   set to mute. Both have to be dealt with inside a genuine tap handler. */
+var audioUnlocked = false;
+function unlockAudio(){
+  if(audioUnlocked) return;
+  audioUnlocked = true;
+  try{
+    /* Safari 16.4 and up: play through the ringer switch, like a game does. */
+    if(navigator.audioSession) navigator.audioSession.type = "playback";
+  }catch(e){}
+  var c = ac();
+  if(c){
+    try{
+      var src = c.createBufferSource();
+      src.buffer = c.createBuffer(1, 1, 22050);
+      src.connect(c.destination);
+      if(src.start) src.start(0); else if(src.noteOn) src.noteOn(0);
+    }catch(e){}
+  }
+}
+["pointerdown","touchend","click"].forEach(function(evt){
+  document.addEventListener(evt, unlockAudio, {capture:true, once:true, passive:true});
+});
+document.addEventListener("visibilitychange", function(){
+  /* Coming back from the home screen leaves the context suspended. */
+  if(!document.hidden && audioCtx && audioCtx.state !== "running"){
+    try{ audioCtx.resume(); }catch(e){}
+  }
+});
+
 function tone(freq, delay, dur, type, vol){
   if(!soundOn) return;
   var c = ac(); if(!c) return;
   try{
-    var o = c.createOscillator(), g = c.createGain(), t = c.currentTime + delay;
+    var o = c.createOscillator(), g = c.createGain();
+    var t = c.currentTime + 0.03 + delay;   /* a little lead, so nothing is clipped */
     o.type = type || "sine"; o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol || 0.16, t + 0.02);
@@ -611,37 +674,64 @@ function sfxBad(){ tone(233,0,.17,"sine",.15); tone(175,.11,.24,"sine",.13); }
 function sfxWin(){ [523,659,784,1047,1319].forEach(function(f,i){ tone(f, i*0.13, .38, "triangle", .18); }); }
 function sfxTap(){ tone(560,0,.07,"sine",.1); }
 
+/* ---------- speech ---------- */
 var canSpeak = ("speechSynthesis" in window) && ("SpeechSynthesisUtterance" in window);
+
 function pickVoice(){
   if(!canSpeak) return;
   var vs = [];
   try{ vs = speechSynthesis.getVoices() || []; }catch(e){ return; }
+  if(!vs.length) return;
   var pref = ["Samantha","Google US English","Microsoft Zira","Microsoft Aria","Karen","Moira","Google UK English Female"];
-  for(var i=0;i<pref.length;i++){
-    for(var j=0;j<vs.length;j++){ if(vs[j].name && vs[j].name.indexOf(pref[i]) >= 0){ voice = vs[j]; return; } }
+  var i, j;
+  for(i=0;i<pref.length;i++){
+    for(j=0;j<vs.length;j++){
+      if(vs[j].name && vs[j].name.indexOf(pref[i]) >= 0 && vs[j].localService !== false){ voice = vs[j]; return; }
+    }
   }
-  for(var k=0;k<vs.length;k++){ if(/^en/i.test(vs[k].lang || "")){ voice = vs[k]; return; } }
+  for(j=0;j<vs.length;j++){ if(/^en/i.test(vs[j].lang || "") && vs[j].localService !== false){ voice = vs[j]; return; } }
+  for(j=0;j<vs.length;j++){ if(/^en/i.test(vs[j].lang || "")){ voice = vs[j]; return; } }
 }
 if(canSpeak){
   pickVoice();
-  try{ speechSynthesis.addEventListener("voiceschanged", pickVoice); }catch(e){ speechSynthesis.onvoiceschanged = pickVoice; }
+  try{ speechSynthesis.addEventListener("voiceschanged", pickVoice); }
+  catch(e){ speechSynthesis.onvoiceschanged = pickVoice; }
 }
-function shutUp(){ if(canSpeak){ try{ speechSynthesis.cancel(); }catch(e){} } }
-function say(text, keepGoing){
-  if(!soundOn || !canSpeak || !text) return;
+
+function busyTalking(){
+  try{ return speechSynthesis.speaking || speechSynthesis.pending; }catch(e){ return false; }
+}
+function shutUp(){
+  clearTimeout(speakTimer);
+  /* Cancelling when nothing is queued can wedge the engine on iOS. */
+  if(canSpeak && busyTalking()){ try{ speechSynthesis.cancel(); }catch(e){} }
+}
+function speakNow(lines){
   try{
-    if(!keepGoing) speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.86; u.pitch = 1.12; u.lang = "en-US";
-    if(voice) u.voice = voice;
-    speechSynthesis.speak(u);
+    speechSynthesis.resume();   /* iOS sometimes leaves the queue paused */
+    lines.forEach(function(text){
+      var u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.86; u.pitch = 1.12; u.lang = "en-US";
+      if(voice) u.voice = voice;
+      speechSynthesis.speak(u);
+    });
   }catch(e){}
 }
-function sayLines(lines){
-  if(!soundOn || !canSpeak) return;
-  shutUp();
-  lines.forEach(function(line){ say(line, true); });
+var speakTimer = null;
+function sayAll(lines){
+  if(!soundOn || !canSpeak || !lines || !lines.length) return;
+  clearTimeout(speakTimer);
+  if(busyTalking()){
+    /* On iOS a cancel followed by an immediate speak comes out silent,
+       so give the engine a beat to clear first. */
+    try{ speechSynthesis.cancel(); }catch(e){}
+    speakTimer = setTimeout(function(){ speakNow(lines); }, 120);
+  }else{
+    speakNow(lines);   /* stays inside the tap, which is what iOS requires */
+  }
 }
+function say(text){ if(text) sayAll([text]); }
+function sayLines(lines){ sayAll(lines); }
 
 /* =========================================================
    4. LITTLE HELPERS
@@ -1177,8 +1267,28 @@ function makeStars(){
   host.appendChild(frag);
 }
 
+/* The first tap has to be a real one: iPhones and iPads will not start
+   audio or the reading voice from code that no finger asked for. */
+function openGate(){
+  var gate = $("startgate");
+  $("gateSun").innerHTML = planetSVG(byId.sun, 56, "gate");
+  if(isIOS){
+    $("gateNote").innerHTML = "On iPhone and iPad, turn off the <b>silent switch</b> on the side and turn the volume up, or you will not hear the voice.";
+  }else{
+    $("gateNote").textContent = "Turn the volume up. Every planet name and fact can be read out loud.";
+  }
+  $("gateBtn").addEventListener("click", function(){
+    unlockAudio();
+    sfxTap();
+    say("Our solar system! Tap a planet.");   /* primes the voice inside the tap */
+    gate.classList.add("gone");
+    setTimeout(function(){ gate.style.display = "none"; }, 400);
+  });
+}
+
 /* ---- go ---- */
 makeStars();
+openGate();
 buildLineup();
 
 var exploreMap = buildMap("mapExplore", "ex", true);
