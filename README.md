@@ -10,6 +10,26 @@ Double-click `index.html`, or drag it onto a browser window. It works offline
 and runs the same from a phone, a tablet or a laptop. To put it on a tablet,
 copy the one file across, or host it anywhere that serves static files.
 
+The app opens on a "Tap to start" screen. That tap is not decoration: browsers
+refuse to start audio or the reading voice until a real finger asks for it, so
+the first tap is what switches the sound on. You should hear a short welcome
+line straight away, which also tells you the sound is working.
+
+### If there is no sound on an iPhone or iPad
+
+Three things silence it, in the order they usually bite:
+
+1. **The silent switch.** iOS mutes web audio *and* the reading voice when the
+   side switch is set to silent. Flick it off and turn the volume up. The app
+   asks iOS to play through the switch where the system allows it, but the
+   switch still wins on older versions.
+2. **Previewing the file instead of opening it.** Tapping the file inside
+   another app, such as a file preview, a mail attachment or a chat window,
+   runs it in a restricted viewer that blocks audio. Open it in Safari itself:
+   share the file to Safari, or host it and visit the address.
+3. **Skipping the start tap.** If the start screen was dismissed without a real
+   tap, sound stays locked. Reload the page and tap the button.
+
 ## The four screens
 
 **Explore** shows the Sun with the planets orbiting around it, plus the asteroid
@@ -41,6 +61,11 @@ answers just wiggle, so there is nothing to undo.
   the nearest planet rather than needing a direct hit.
 - **Big controls.** The bottom bar and all buttons are sized for small fingers.
 - **Sound off.** One toggle in the corner silences speech and effects.
+- **Sound that survives iOS.** The audio engine is unlocked inside the first
+  tap, the page asks for a playback audio session so the ringer switch does not
+  mute it, the context is resumed after the app returns from the background,
+  and speech is never cancelled and restarted in the same instant, which is a
+  combination iOS renders as silence.
 - **Pause.** The orbits can be stopped. They also start stopped for anyone whose
   device asks for reduced motion.
 - **Keyboard and screen readers.** Planets are focusable buttons with labels;
