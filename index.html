@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060a1a">
+<meta name="description" content="A friendly solar system app for young readers.">
+<title>Our Solar System</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  height:100dvh;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:#060a1a;
+  background-image:radial-gradient(130% 95% at 50% 0%, #1b2a66 0%, #0b1234 45%, #05070f 100%);
+  color:#fff;
+  font-family:ui-rounded,"SF Pro Rounded","Comic Sans MS","Trebuchet MS",system-ui,-apple-system,Segoe UI,sans-serif;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+}
+button{font-family:inherit}
+
+/* ---------- starfield ---------- */
+#stars{position:fixed;inset:0;z-index:0;pointer-events:none}
+#stars .star{position:absolute;background:#fff;border-radius:50%;animation:tw 4s ease-in-out infinite}
+@keyframes tw{0%,100%{opacity:.22}50%{opacity:.9}}
+
+/* ---------- header ---------- */
+header{
+  position:relative;z-index:20;display:flex;align-items:center;gap:8px;
+  padding:calc(6px + env(safe-area-inset-top)) 10px 6px;
+}
+h1{
+  margin:0;flex:1;min-width:0;font-size:clamp(17px,5vw,26px);letter-spacing:.3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-shadow:0 2px 12px rgba(120,160,255,.45);
+}
+h1 .em{color:#ffd34d}
+.iconbtn{
+  flex:none;width:46px;height:46px;border-radius:15px;cursor:pointer;
+  border:2px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);
+  color:#fff;font-size:21px;line-height:1;display:grid;place-items:center;
+}
+.iconbtn:active{transform:scale(.93)}
+.iconbtn[aria-pressed="true"]{background:rgba(255,211,77,.22);border-color:#ffd34d}
+.iconbtn.hide{display:none}
+
+/* ---------- screens ---------- */
+main{position:relative;z-index:1;flex:1;min-height:0}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;min-height:0}
+.screen.active{display:flex}
+
+/* ---------- orbit map ---------- */
+.maphost{flex:1;min-height:0;position:relative}
+.mapsvg{width:100%;height:100%;display:block}
+.ring{fill:none;stroke:rgba(150,180,255,.26);stroke-width:2}
+.ring-dwarf{stroke:rgba(190,170,255,.3);stroke-dasharray:9 11}
+.belt circle{fill:#b9a68f;opacity:.75}
+.body{cursor:pointer}
+.plabel{
+  font-size:30px;font-weight:800;fill:#fff;letter-spacing:.5px;
+  paint-order:stroke;stroke:#05070f;stroke-width:7px;stroke-linejoin:round;
+  pointer-events:none;
+}
+.sublabel{font-size:21px;fill:#cdb8ff;paint-order:stroke;stroke:#05070f;stroke-width:6px;pointer-events:none}
+.nolabels .plabel,.nolabels .sublabel{display:none}
+.halo{fill:none;stroke:#ffd34d;stroke-width:6;opacity:0;pointer-events:none}
+.body.hint .halo{opacity:1;animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25;stroke-width:5}50%{opacity:1;stroke-width:9}}
+.body.wrongwig{animation:wig .45s ease}
+@keyframes wig{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-7px)}80%{transform:translateX(7px)}}
+.body.pop{animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.mapsvg .body:focus{outline:none}
+.mapsvg .body:focus-visible .hit{stroke:#ffd34d;stroke-width:4}
+
+.hintchip{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:10px;
+  background:rgba(255,211,77,.92);color:#2a1a00;font-weight:800;font-size:15px;
+  padding:9px 16px;border-radius:999px;transition:opacity .5s;pointer-events:none;
+  box-shadow:0 6px 18px rgba(0,0,0,.4);
+}
+.hintchip.gone{opacity:0}
+
+/* ---------- line up ---------- */
+.lineWrap{flex:1;min-height:0;display:flex;flex-direction:column}
+.lineTitle{padding:4px 14px 0;font-size:15px;color:#b9c6ef;text-align:center}
+.lineScroll{
+  flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;
+  display:flex;align-items:center;gap:12px;padding:10px 16px 14px;
+  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+}
+.sunSlab{
+  flex:none;width:92px;position:relative;overflow:hidden;border-radius:18px;
+  background:rgba(255,255,255,.04);border:2px solid rgba(255,211,77,.35);
+  display:flex;align-items:flex-end;justify-content:center;cursor:pointer;
+}
+.sunBall{
+  position:absolute;border-radius:50%;right:6px;top:50%;transform:translateY(-50%);
+  background:radial-gradient(circle at 60% 40%,#fff6cf,#ffcf3f 45%,#ff8a1e 100%);
+  box-shadow:0 0 60px 18px rgba(255,170,40,.45);
+}
+.sunSlab .cap{position:relative;z-index:2;padding:8px 6px;font-size:12px;font-weight:800;text-align:center;
+  background:linear-gradient(180deg,rgba(6,10,26,0),rgba(6,10,26,.92) 45%);width:100%}
+.lineCell{
+  flex:none;min-width:88px;scroll-snap-align:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:7px;
+  background:none;border:2px solid transparent;border-radius:18px;padding:8px 4px 6px;color:#fff;cursor:pointer;
+}
+.lineCell:active{background:rgba(255,255,255,.08)}
+.lineBall{position:relative;display:flex;align-items:flex-end;justify-content:center}
+.lineBall .tinyRing{position:absolute;left:50%;transform:translateX(-50%);width:34px;height:34px;border:2px dashed rgba(255,211,77,.7);border-radius:50%}
+.lineCell .nm{font-size:15px;font-weight:800;line-height:1.1;text-align:center}
+.lineCell .mn{font-size:12px;color:#ffd34d;font-weight:700}
+.lineCell .dw{font-size:11px;color:#cdb8ff;font-weight:700}
+
+/* ---------- games shared ---------- */
+.gamebar{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+}
+.prompt{
+  flex:1;min-width:0;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.16);
+  border-radius:18px;padding:10px 14px;font-size:clamp(17px,4.6vw,23px);font-weight:800;color:#fff;cursor:pointer;text-align:left;
+}
+.score{flex:none;font-size:15px;font-weight:800;color:#ffd34d;white-space:nowrap}
+
+/* ---------- order game ---------- */
+.orderWrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;padding:0 10px 10px;overflow-y:auto}
+.screen.compact .gamebar{padding:6px 10px}
+.screen.compact .prompt{font-size:15px;padding:8px 12px}
+.screen.compact .trayTitle{font-size:12px;margin:2px 0}
+.screen.compact .chip{width:76px;padding:5px 3px;border-radius:14px}
+.screen.compact .chip .cnm{font-size:13px}
+.slots{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.slot{
+  border-radius:14px;border:2px dashed rgba(255,255,255,.28);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:rgba(255,255,255,.04);
+}
+.slot .num{font-size:13px;color:#8e9ac6;font-weight:800}
+.slot.filled{border-style:solid;border-color:#5ce08b;background:rgba(92,224,139,.12)}
+.slot .snm{font-size:12px;font-weight:800}
+.trayTitle{text-align:center;font-size:14px;color:#b9c6ef;margin-top:2px}
+.tray{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding-bottom:6px}
+.chip{
+  width:94px;border-radius:18px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);
+  color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;cursor:pointer;
+}
+.chip:active{transform:scale(.95)}
+.chip .cnm{font-size:15px;font-weight:800}
+.chip.bad{animation:wig2 .45s ease;border-color:#ff8a8a}
+@keyframes wig2{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-5px)}}
+
+/* ---------- reward ---------- */
+.reward{
+  position:absolute;inset:0;z-index:15;display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;text-align:center;padding:20px;background:rgba(6,10,26,.93);
+}
+.reward.on{display:flex}
+.reward h2{margin:0;font-size:clamp(26px,8vw,40px);color:#ffd34d}
+.reward .stars{font-size:clamp(24px,7vw,34px);letter-spacing:4px;line-height:1.3;max-width:90%}
+.reward p{margin:0;font-size:17px;color:#d6deff;max-width:22em;line-height:1.5}
+.bigbtn{
+  border:none;border-radius:20px;padding:16px 26px;font-size:20px;font-weight:800;cursor:pointer;
+  background:linear-gradient(180deg,#ffd34d,#ff9f1c);color:#2a1a00;box-shadow:0 8px 20px rgba(255,160,30,.35);
+}
+.bigbtn:active{transform:scale(.96)}
+.bigbtn.ghost{background:rgba(255,255,255,.1);color:#fff;box-shadow:none;border:2px solid rgba(255,255,255,.25)}
+
+/* ---------- nav ---------- */
+nav{
+  position:relative;z-index:20;display:flex;gap:7px;
+  padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+  background:rgba(6,10,26,.9);border-top:2px solid rgba(255,255,255,.1);
+}
+.navbtn{
+  flex:1;min-height:60px;border-radius:17px;cursor:pointer;
+  border:2px solid rgba(255,255,255,.08);background:rgba(255,255,255,.06);color:#cfd8f5;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:12.5px;font-weight:800;
+}
+.navbtn .ico{font-size:21px;line-height:1}
+.navbtn:active{transform:scale(.95)}
+.navbtn.active{background:linear-gradient(180deg,#ffd34d,#ffa726);color:#2a1a00;border-color:#fff3c4}
+
+/* ---------- planet card ---------- */
+#scrim{position:fixed;inset:0;z-index:30;background:rgba(2,4,12,.6);opacity:0;pointer-events:none;transition:opacity .3s}
+#scrim.on{opacity:1;pointer-events:auto}
+#sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;max-height:92dvh;overflow-y:auto;
+  background:linear-gradient(180deg,#172046,#0e1430);
+  border-radius:26px 26px 0 0;border-top:2px solid rgba(255,255,255,.18);
+  box-shadow:0 -14px 40px rgba(0,0,0,.55);
+  padding:10px 16px calc(18px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .34s cubic-bezier(.2,.9,.3,1);
+}
+#sheet.open{transform:none}
+.grab{width:54px;height:6px;border-radius:99px;background:rgba(255,255,255,.28);margin:2px auto 8px}
+.cardHead{display:flex;gap:12px;align-items:center}
+.cardArt{flex:none;width:44%;max-width:190px;height:122px}
+.cardArt svg{width:100%;height:100%;display:block}
+.cardHead .info{flex:1;min-width:0}
+.badge{display:inline-block;font-size:12px;font-weight:800;color:#2a1a00;background:#ffd34d;border-radius:99px;padding:4px 10px}
+.badge.dw{background:#cdb8ff}
+#cardName{margin:6px 0 0;font-size:clamp(28px,9vw,44px);line-height:1.05}
+.phon{font-size:15px;color:#9fb0e6;font-weight:700;letter-spacing:.6px}
+.readall{
+  margin-top:8px;border:none;border-radius:16px;padding:11px 16px;font-size:16px;font-weight:800;cursor:pointer;
+  background:linear-gradient(180deg,#7ee0ff,#3aa7e8);color:#062033;
+}
+.readall:active{transform:scale(.96)}
+.facts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.fact{
+  display:flex;align-items:center;gap:10px;text-align:left;cursor:pointer;
+  border:2px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;
+  border-radius:16px;padding:12px 13px;font-size:clamp(17px,4.6vw,20px);font-weight:700;line-height:1.35;
+}
+.fact:active{background:rgba(255,255,255,.14)}
+.fact .spk{margin-left:auto;font-size:19px;opacity:.85}
+.wow{
+  margin-top:10px;display:flex;align-items:center;gap:10px;text-align:left;width:100%;cursor:pointer;
+  border:2px solid rgba(255,211,77,.55);background:rgba(255,211,77,.14);color:#fff;
+  border-radius:18px;padding:13px;font-size:clamp(16px,4.4vw,19px);font-weight:700;line-height:1.35;
+}
+.wow .star{font-size:24px;flex:none}
+.stats{display:flex;gap:8px;margin-top:12px}
+.stat{
+  flex:1;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);border-radius:16px;
+  padding:9px 8px;text-align:center;min-width:0;
+}
+.stat .k{font-size:11px;color:#9fb0e6;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.stat .v{font-size:15px;font-weight:800;margin-top:3px;line-height:1.2}
+.tempTrack{position:relative;height:9px;border-radius:99px;margin-top:7px;
+  background:linear-gradient(90deg,#6ec6ff,#a7e7ff,#fff0b3,#ffb04d,#ff5a3c)}
+.tempTrack i{position:absolute;top:50%;width:15px;height:15px;border-radius:50%;background:#fff;
+  border:3px solid #0e1430;transform:translate(-50%,-50%)}
+.cardNav{display:flex;gap:10px;margin-top:14px}
+.cardNav button{
+  flex:1;border-radius:18px;padding:14px 8px;font-size:16px;font-weight:800;cursor:pointer;
+  border:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.09);color:#fff;
+}
+.cardNav .close{background:linear-gradient(180deg,#ffd34d,#ff9f1c);color:#2a1a00;border-color:#ffe08a}
+.cardNav button:active{transform:scale(.96)}
+
+/* ---------- banner + confetti ---------- */
+#banner{
+  position:fixed;left:50%;top:22%;transform:translate(-50%,-14px) scale(.8);z-index:45;
+  padding:14px 26px;border-radius:24px;font-size:clamp(22px,7vw,34px);font-weight:800;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .28s cubic-bezier(.2,1.4,.4,1);
+  box-shadow:0 12px 32px rgba(0,0,0,.45);text-align:center;max-width:90vw;
+}
+#banner.show{opacity:1;transform:translate(-50%,0) scale(1)}
+#banner.good{background:#5ce08b;color:#04301a}
+#banner.bad{background:#ffd9d9;color:#5b1111}
+.conf{position:fixed;width:11px;height:14px;border-radius:3px;z-index:50;pointer-events:none}
+
+#assets{position:absolute;width:0;height:0;overflow:hidden}
+@media (prefers-reduced-motion: reduce){
+  #stars .star{animation:none;opacity:.6}
+  *{scroll-behavior:auto}
+}
+@media (max-height:560px){
+  .navbtn{min-height:50px;font-size:11.5px}
+  .navbtn .ico{font-size:18px}
+  .cardArt{height:96px}
+}
+</style>
+</head>
+<body>
+<div id="stars" aria-hidden="true"></div>
+
+<header>
+  <h1>Our <span class="em">Solar System</span></h1>
+  <button class="iconbtn" id="btnSound" aria-pressed="true" aria-label="Sound on or off" title="Sound">&#128266;</button>
+  <button class="iconbtn" id="btnPause" aria-pressed="false" aria-label="Pause or play the orbits" title="Pause">&#9208;&#65039;</button>
+  <button class="iconbtn" id="btnFull" aria-label="Full screen" title="Full screen">&#9974;</button>
+</header>
+
+<main>
+  <!-- ===== EXPLORE ===== -->
+  <section class="screen active" id="screen-explore" aria-label="Explore the solar system">
+    <div class="maphost" id="mapExplore"></div>
+    <div class="hintchip" id="exploreHint">&#128070; Tap a planet!</div>
+  </section>
+
+  <!-- ===== LINE UP ===== -->
+  <section class="screen" id="screen-lineup" aria-label="Planets lined up by size">
+    <div class="lineWrap">
+      <p class="lineTitle" id="lineTitle">How big is each one? Slide to see them all. &#128073;</p>
+      <div class="lineScroll" id="lineScroll"></div>
+    </div>
+  </section>
+
+  <!-- ===== FIND IT ===== -->
+  <section class="screen" id="screen-find" aria-label="Find it game">
+    <div class="gamebar">
+      <button class="prompt" id="findPrompt" aria-live="polite">Find Mars! &#128266;</button>
+      <span class="score" id="findScore">1 / 8</span>
+      <button class="iconbtn" id="btnLabels" aria-pressed="true" aria-label="Show or hide planet names" title="Show names">Aa</button>
+    </div>
+    <div class="maphost" id="mapFind"></div>
+    <div class="reward" id="findReward">
+      <h2>You did it!</h2>
+      <div class="stars" id="findStars">&#11088;</div>
+      <p id="findMsg">You found all of them.</p>
+      <button class="bigbtn" id="findAgain">Play again</button>
+    </div>
+  </section>
+
+  <!-- ===== IN ORDER ===== -->
+  <section class="screen" id="screen-order" aria-label="Put the planets in order">
+    <div class="gamebar">
+      <button class="prompt" id="orderPrompt">Tap the planets in order from the Sun. &#128266;</button>
+    </div>
+    <div class="orderWrap" id="orderWrap">
+      <div class="slots" id="orderSlots"></div>
+      <p class="trayTitle">Which one comes next?</p>
+      <div class="tray" id="orderTray"></div>
+    </div>
+    <div class="reward" id="orderReward">
+      <h2>Perfect order!</h2>
+      <div class="stars">&#11088;&#11088;&#11088;&#11088;&#11088;</div>
+      <p>My Very Excellent Mother Just Served Us Nachos.<br>And way out past Neptune... Pluto!</p>
+      <button class="bigbtn" id="orderAgain">Play again</button>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="navbtn active" data-screen="explore"><span class="ico">&#128302;</span>Explore</button>
+  <button class="navbtn" data-screen="lineup"><span class="ico">&#128207;</span>Line Up</button>
+  <button class="navbtn" data-screen="find"><span class="ico">&#128269;</span>Find It!</button>
+  <button class="navbtn" data-screen="order"><span class="ico">&#127919;</span>In Order</button>
+</nav>
+
+<div id="scrim"></div>
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="cardName">
+  <div class="grab"></div>
+  <div class="cardHead">
+    <div class="cardArt" id="cardArt"></div>
+    <div class="info">
+      <span class="badge" id="cardBadge">4th from the Sun</span>
+      <h2 id="cardName">Mars</h2>
+      <div class="phon" id="cardPhon">MARZ</div>
+      <button class="readall" id="cardRead">&#128266; Read to me</button>
+    </div>
+  </div>
+  <div class="facts" id="cardFacts"></div>
+  <button class="wow" id="cardWow"><span class="star">&#11088;</span><span id="cardWowText"></span></button>
+  <div class="stats">
+    <div class="stat"><div class="k">Moons</div><div class="v" id="cardMoons">2</div></div>
+    <div class="stat"><div class="k">Size</div><div class="v" id="cardSize">Half of Earth</div></div>
+    <div class="stat"><div class="k">Feels</div><div class="v" id="cardTemp">Cold</div>
+      <div class="tempTrack"><i id="cardTempDot"></i></div></div>
+  </div>
+  <div class="cardNav">
+    <button id="cardPrev">&#9664; Back</button>
+    <button class="close" id="cardClose">Close</button>
+    <button id="cardNext">Next &#9654;</button>
+  </div>
+</div>
+
+<div id="banner" role="status" aria-live="assertive"></div>
+
+<svg id="assets" aria-hidden="true" focusable="false"><defs>
+  <radialGradient id="g-sun" cx="50%" cy="50%" r="55%">
+    <stop offset="0%" stop-color="#fffbe6"/><stop offset="45%" stop-color="#ffd647"/><stop offset="100%" stop-color="#ff8514"/>
+  </radialGradient>
+  <radialGradient id="g-mercury" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#d6cec5"/><stop offset="55%" stop-color="#9d958c"/><stop offset="100%" stop-color="#5d574f"/>
+  </radialGradient>
+  <radialGradient id="g-venus" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#fdeec4"/><stop offset="55%" stop-color="#e7bd72"/><stop offset="100%" stop-color="#a9732c"/>
+  </radialGradient>
+  <radialGradient id="g-earth" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#8fd4ff"/><stop offset="55%" stop-color="#2e86d0"/><stop offset="100%" stop-color="#11386e"/>
+  </radialGradient>
+  <radialGradient id="g-mars" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#ff9e6b"/><stop offset="55%" stop-color="#d1552c"/><stop offset="100%" stop-color="#7c2a12"/>
+  </radialGradient>
+  <radialGradient id="g-jupiter" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#f6ddbe"/><stop offset="55%" stop-color="#d3a271"/><stop offset="100%" stop-color="#8a5a33"/>
+  </radialGradient>
+  <radialGradient id="g-saturn" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#fbeec6"/><stop offset="55%" stop-color="#dfc083"/><stop offset="100%" stop-color="#9b7b3f"/>
+  </radialGradient>
+  <radialGradient id="g-uranus" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#d4fbfb"/><stop offset="55%" stop-color="#8ad9e3"/><stop offset="100%" stop-color="#3d8fa8"/>
+  </radialGradient>
+  <radialGradient id="g-neptune" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#9fc0ff"/><stop offset="55%" stop-color="#4a6fdc"/><stop offset="100%" stop-color="#1f2f86"/>
+  </radialGradient>
+  <radialGradient id="g-pluto" cx="34%" cy="30%" r="76%">
+    <stop offset="0%" stop-color="#eadfd2"/><stop offset="55%" stop-color="#bfa894"/><stop offset="100%" stop-color="#77634f"/>
+  </radialGradient>
+  <radialGradient id="g-shade" cx="34%" cy="30%" r="74%">
+    <stop offset="52%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.45"/>
+  </radialGradient>
+  <filter id="f-sunglow" x="-75%" y="-75%" width="250%" height="250%">
+    <feGaussianBlur stdDeviation="9" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs></svg>
+
+<noscript><p style="padding:20px;font-size:18px">Please turn on JavaScript to play with the solar system.</p></noscript>
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   1. THE FACTS
+   Every sentence is short on purpose: a 6-year-old should be
+   able to sound it out, and tap the speaker to check.
+   ========================================================= */
+var BODIES = [
+  {
+    id:"sun", name:"Sun", phon:"SUN", kind:"star",
+    badge:"Our star", mnemonic:"", moons:"None",
+    size:"109 Earths wide", temp:"Blazing hot", tempLevel:1,
+    draw:48, orbit:0, start:0, speed:0, km:1391400,
+    facts:["The Sun is a star.","It is a huge ball of fire.","It gives us light and heat."],
+    wow:"A million Earths could fit inside the Sun!"
+  },
+  {
+    id:"mercury", name:"Mercury", phon:"MER-kyur-ee", kind:"planet",
+    badge:"1st from the Sun", mnemonic:"My", moons:"0",
+    size:"Smaller than Earth", temp:"Hot and cold", tempLevel:0.86,
+    draw:11, orbit:100, start:318, speed:24, km:4879,
+    facts:["Mercury is the smallest planet.","It is closest to the Sun.","It has no moons at all."],
+    wow:"Mercury races around the Sun in only 88 days!"
+  },
+  {
+    id:"venus", name:"Venus", phon:"VEE-nus", kind:"planet",
+    badge:"2nd from the Sun", mnemonic:"Very", moons:"0",
+    size:"Almost as big as Earth", temp:"Hottest", tempLevel:0.97,
+    draw:15, orbit:140, start:95, speed:18, km:12104,
+    facts:["Venus is the hottest planet.","Thick clouds cover it.","It is almost as big as Earth."],
+    wow:"One day on Venus is longer than one whole year there!"
+  },
+  {
+    id:"earth", name:"Earth", phon:"URTH", kind:"planet",
+    badge:"3rd from the Sun", mnemonic:"Excellent", moons:"1",
+    size:"Our size!", temp:"Just right", tempLevel:0.55,
+    draw:16, orbit:182, start:175, speed:14, km:12756,
+    facts:["Earth is our home.","It has land and blue water.","Earth has one moon."],
+    wow:"Earth is the only place we know of with living things!"
+  },
+  {
+    id:"mars", name:"Mars", phon:"MARZ", kind:"planet",
+    badge:"4th from the Sun", mnemonic:"Mother", moons:"2",
+    size:"Half as wide as Earth", temp:"Cold", tempLevel:0.36,
+    draw:13, orbit:222, start:250, speed:11, km:6792,
+    facts:["Mars is the red planet.","It is cold and dusty.","Robots drive around on Mars."],
+    wow:"Mars has the tallest volcano of any planet!"
+  },
+  {
+    id:"jupiter", name:"Jupiter", phon:"JOO-pih-ter", kind:"planet",
+    badge:"5th from the Sun", mnemonic:"Just", moons:"95 or more",
+    size:"11 Earths wide", temp:"Very cold", tempLevel:0.22,
+    draw:30, orbit:305, start:330, speed:7, km:142984,
+    facts:["Jupiter is the biggest planet.","It is a giant ball of gas.","It has a big red spot."],
+    wow:"The Great Red Spot is a storm wider than Earth!"
+  },
+  {
+    id:"saturn", name:"Saturn", phon:"SAT-urn", kind:"planet",
+    badge:"6th from the Sun", mnemonic:"Served", moons:"Over 100",
+    size:"9 Earths wide", temp:"Very cold", tempLevel:0.18,
+    draw:26, orbit:352, start:40, speed:5.5, km:120536,
+    facts:["Saturn has bright rings.","The rings are ice and rock.","Saturn is made of gas."],
+    wow:"Saturn is so light it could float in a giant bathtub!"
+  },
+  {
+    id:"uranus", name:"Uranus", phon:"YOOR-uh-nus", kind:"planet",
+    badge:"7th from the Sun", mnemonic:"Us", moons:"28",
+    size:"4 Earths wide", temp:"Freezing", tempLevel:0.1,
+    draw:21, orbit:394, start:130, speed:4.2, km:51118,
+    facts:["Uranus is blue-green.","It is very, very cold.","It has thin rings."],
+    wow:"Uranus rolls on its side like a ball!"
+  },
+  {
+    id:"neptune", name:"Neptune", phon:"NEP-toon", kind:"planet",
+    badge:"8th from the Sun", mnemonic:"Nachos", moons:"16",
+    size:"4 Earths wide", temp:"Freezing", tempLevel:0.07,
+    draw:20, orbit:430, start:215, speed:3.4, km:49528,
+    facts:["Neptune is deep blue.","It is the farthest planet.","It is windy and icy."],
+    wow:"Neptune has the fastest winds in the solar system!"
+  },
+  {
+    id:"pluto", name:"Pluto", phon:"PLOO-toe", kind:"dwarf",
+    badge:"Dwarf planet", mnemonic:"", moons:"5",
+    size:"Smaller than our Moon", temp:"Coldest", tempLevel:0.02,
+    draw:9, orbit:464, start:295, speed:2.6, km:2377,
+    facts:["Pluto is a dwarf planet.","It is small and icy.","It is far, far away."],
+    wow:"Pluto has a giant heart shape on its face!"
+  }
+];
+
+var byId = {};
+BODIES.forEach(function(b,i){ b.index = i; byId[b.id] = b; });
+var PLANET_ORDER = ["mercury","venus","earth","mars","jupiter","saturn","uranus","neptune"];
+var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function $(id){ return document.getElementById(id); }
+
+/* =========================================================
+   2. DRAWING THE PLANETS (inline SVG, no images)
+   ========================================================= */
+function planetSVG(b, r, uid){
+  var cid = "clip-" + uid;
+  var s = '<defs><clipPath id="' + cid + '"><circle r="' + r + '"/></clipPath></defs>';
+  var back = "", front = "";
+
+  if(b.id === "saturn"){
+    back += '<g transform="rotate(-16)">';
+    back += '<path d="M' + (-2.15*r) + ' 0 A ' + (2.15*r) + ' ' + (0.62*r) + ' 0 0 1 ' + (2.15*r) + ' 0" fill="none" stroke="#e8d4a4" stroke-width="' + (0.30*r) + '" opacity=".95"/>';
+    back += '<path d="M' + (-1.62*r) + ' 0 A ' + (1.62*r) + ' ' + (0.47*r) + ' 0 0 1 ' + (1.62*r) + ' 0" fill="none" stroke="#c2a878" stroke-width="' + (0.12*r) + '" opacity=".9"/>';
+    back += "</g>";
+    front += '<g transform="rotate(-16)">';
+    front += '<path d="M' + (-2.15*r) + ' 0 A ' + (2.15*r) + ' ' + (0.62*r) + ' 0 0 0 ' + (2.15*r) + ' 0" fill="none" stroke="#f3e2b6" stroke-width="' + (0.30*r) + '" opacity=".95"/>';
+    front += '<path d="M' + (-1.62*r) + ' 0 A ' + (1.62*r) + ' ' + (0.47*r) + ' 0 0 0 ' + (1.62*r) + ' 0" fill="none" stroke="#c2a878" stroke-width="' + (0.12*r) + '" opacity=".9"/>';
+    front += "</g>";
+  }
+  if(b.id === "uranus"){
+    back += '<ellipse rx="' + (1.22*r) + '" ry="' + (0.15*r) + '" fill="none" stroke="#bff0f6" stroke-width="' + (0.07*r) + '" opacity=".85" transform="rotate(-76)"/>';
+  }
+
+  var ball = '<circle r="' + r + '" fill="url(#g-' + b.id + ')"' + (b.id==="sun" ? ' filter="url(#f-sunglow)"' : "") + "/>";
+  var detail = '<g clip-path="url(#' + cid + ')">';
+
+  if(b.id === "sun"){
+    detail += '<circle cx="' + (-0.35*r) + '" cy="' + (0.28*r) + '" r="' + (0.2*r) + '" fill="#fff3b0" opacity=".55"/>';
+    detail += '<circle cx="' + (0.32*r) + '" cy="' + (-0.3*r) + '" r="' + (0.15*r) + '" fill="#fff8d8" opacity=".5"/>';
+    detail += '<circle cx="' + (0.1*r) + '" cy="' + (0.5*r) + '" r="' + (0.13*r) + '" fill="#ffab3d" opacity=".5"/>';
+  } else if(b.id === "mercury"){
+    detail += '<circle cx="' + (-0.3*r) + '" cy="' + (-0.25*r) + '" r="' + (0.22*r) + '" fill="#7d766e" opacity=".55"/>';
+    detail += '<circle cx="' + (0.35*r) + '" cy="' + (0.2*r) + '" r="' + (0.16*r) + '" fill="#6f6962" opacity=".5"/>';
+    detail += '<circle cx="' + (0.05*r) + '" cy="' + (0.55*r) + '" r="' + (0.12*r) + '" fill="#837b73" opacity=".5"/>';
+  } else if(b.id === "venus"){
+    detail += '<ellipse cy="' + (-0.3*r) + '" rx="' + r + '" ry="' + (0.17*r) + '" fill="#fff3d2" opacity=".45"/>';
+    detail += '<ellipse cy="' + (0.22*r) + '" rx="' + r + '" ry="' + (0.2*r) + '" fill="#c98f3e" opacity=".4"/>';
+  } else if(b.id === "earth"){
+    detail += '<path d="M' + (-0.85*r) + ' ' + (-0.1*r) + ' q ' + (0.35*r) + ' ' + (-0.5*r) + ' ' + (0.8*r) + ' ' + (-0.15*r) +
+              ' q ' + (0.25*r) + ' ' + (0.3*r) + ' ' + (-0.1*r) + ' ' + (0.5*r) +
+              ' q ' + (-0.5*r) + ' ' + (0.3*r) + ' ' + (-0.7*r) + ' ' + (-0.25*r) + ' z" fill="#57ab52"/>';
+    detail += '<ellipse cx="' + (0.3*r) + '" cy="' + (0.42*r) + '" rx="' + (0.42*r) + '" ry="' + (0.3*r) + '" fill="#4f9d4a" opacity=".95"/>';
+    detail += '<ellipse cy="' + (-0.92*r) + '" rx="' + (0.55*r) + '" ry="' + (0.22*r) + '" fill="#fff" opacity=".85"/>';
+    detail += '<ellipse cy="' + (0.95*r) + '" rx="' + (0.5*r) + '" ry="' + (0.2*r) + '" fill="#fff" opacity=".8"/>';
+  } else if(b.id === "mars"){
+    detail += '<ellipse cx="' + (-0.25*r) + '" cy="' + (0.1*r) + '" rx="' + (0.45*r) + '" ry="' + (0.28*r) + '" fill="#8f3a1c" opacity=".55"/>';
+    detail += '<ellipse cx="' + (0.42*r) + '" cy="' + (-0.3*r) + '" rx="' + (0.28*r) + '" ry="' + (0.2*r) + '" fill="#9c4322" opacity=".5"/>';
+    detail += '<ellipse cy="' + (-0.94*r) + '" rx="' + (0.42*r) + '" ry="' + (0.18*r) + '" fill="#fff" opacity=".85"/>';
+  } else if(b.id === "jupiter"){
+    detail += '<ellipse cy="' + (-0.62*r) + '" rx="' + r + '" ry="' + (0.13*r) + '" fill="#c08d5c" opacity=".5"/>';
+    detail += '<ellipse cy="' + (-0.28*r) + '" rx="' + r + '" ry="' + (0.11*r) + '" fill="#f7e2c4" opacity=".55"/>';
+    detail += '<ellipse cy="' + (0.06*r) + '" rx="' + r + '" ry="' + (0.13*r) + '" fill="#b57c4a" opacity=".5"/>';
+    detail += '<ellipse cy="' + (0.44*r) + '" rx="' + r + '" ry="' + (0.12*r) + '" fill="#f0d6b2" opacity=".5"/>';
+    detail += '<ellipse cy="' + (0.76*r) + '" rx="' + r + '" ry="' + (0.1*r) + '" fill="#a97244" opacity=".45"/>';
+    detail += '<ellipse cx="' + (0.3*r) + '" cy="' + (0.22*r) + '" rx="' + (0.26*r) + '" ry="' + (0.14*r) + '" fill="#cf5a35" opacity=".9"/>';
+  } else if(b.id === "saturn"){
+    detail += '<ellipse cy="' + (-0.45*r) + '" rx="' + r + '" ry="' + (0.15*r) + '" fill="#fff0c9" opacity=".45"/>';
+    detail += '<ellipse cy="' + (0.2*r) + '" rx="' + r + '" ry="' + (0.16*r) + '" fill="#c8a45f" opacity=".4"/>';
+  } else if(b.id === "uranus"){
+    detail += '<ellipse cx="' + (-0.3*r) + '" rx="' + (0.16*r) + '" ry="' + r + '" fill="#c6f4f8" opacity=".3"/>';
+    detail += '<ellipse cx="' + (0.35*r) + '" rx="' + (0.13*r) + '" ry="' + r + '" fill="#63b6c9" opacity=".3"/>';
+  } else if(b.id === "neptune"){
+    detail += '<ellipse cy="' + (-0.35*r) + '" rx="' + r + '" ry="' + (0.13*r) + '" fill="#b6ceff" opacity=".35"/>';
+    detail += '<ellipse cx="' + (-0.25*r) + '" cy="' + (0.3*r) + '" rx="' + (0.3*r) + '" ry="' + (0.17*r) + '" fill="#16226b" opacity=".6"/>';
+  } else if(b.id === "pluto"){
+    detail += '<path d="M0 ' + (0.62*r) + ' C ' + (-0.75*r) + ' ' + (0.15*r) + ' ' + (-0.5*r) + ' ' + (-0.42*r) + ' 0 ' + (-0.05*r) +
+              ' C ' + (0.5*r) + ' ' + (-0.42*r) + ' ' + (0.75*r) + ' ' + (0.15*r) + ' 0 ' + (0.62*r) + ' z" fill="#f6ecdc" opacity=".9"/>';
+    detail += '<circle cx="' + (-0.45*r) + '" cy="' + (-0.45*r) + '" r="' + (0.2*r) + '" fill="#8c7662" opacity=".5"/>';
+  }
+  detail += "</g>";
+
+  var shade = b.id === "sun" ? "" : '<circle r="' + r + '" fill="url(#g-shade)"/>';
+  return s + back + ball + detail + shade + front;
+}
+
+/* =========================================================
+   3. SOUND: speech for reading, beeps for the games.
+   Nothing is downloaded; tones are made with the audio API.
+   ========================================================= */
+var soundOn = true, audioCtx = null, voice = null;
+
+function ac(){
+  if(!audioCtx){
+    try{ var AC = window.AudioContext || window.webkitAudioContext; audioCtx = AC ? new AC() : null; }
+    catch(e){ audioCtx = null; }
+  }
+  if(audioCtx && audioCtx.state === "suspended"){ try{ audioCtx.resume(); }catch(e){} }
+  return audioCtx;
+}
+function tone(freq, delay, dur, type, vol){
+  if(!soundOn) return;
+  var c = ac(); if(!c) return;
+  try{
+    var o = c.createOscillator(), g = c.createGain(), t = c.currentTime + delay;
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.16, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }catch(e){}
+}
+function sfxGood(){ tone(659,0,.18,"triangle",.18); tone(880,.09,.2,"triangle",.18); tone(1319,.19,.3,"triangle",.14); }
+function sfxBad(){ tone(233,0,.17,"sine",.15); tone(175,.11,.24,"sine",.13); }
+function sfxWin(){ [523,659,784,1047,1319].forEach(function(f,i){ tone(f, i*0.13, .38, "triangle", .18); }); }
+function sfxTap(){ tone(560,0,.07,"sine",.1); }
+
+var canSpeak = ("speechSynthesis" in window) && ("SpeechSynthesisUtterance" in window);
+function pickVoice(){
+  if(!canSpeak) return;
+  var vs = [];
+  try{ vs = speechSynthesis.getVoices() || []; }catch(e){ return; }
+  var pref = ["Samantha","Google US English","Microsoft Zira","Microsoft Aria","Karen","Moira","Google UK English Female"];
+  for(var i=0;i<pref.length;i++){
+    for(var j=0;j<vs.length;j++){ if(vs[j].name && vs[j].name.indexOf(pref[i]) >= 0){ voice = vs[j]; return; } }
+  }
+  for(var k=0;k<vs.length;k++){ if(/^en/i.test(vs[k].lang || "")){ voice = vs[k]; return; } }
+}
+if(canSpeak){
+  pickVoice();
+  try{ speechSynthesis.addEventListener("voiceschanged", pickVoice); }catch(e){ speechSynthesis.onvoiceschanged = pickVoice; }
+}
+function shutUp(){ if(canSpeak){ try{ speechSynthesis.cancel(); }catch(e){} } }
+function say(text, keepGoing){
+  if(!soundOn || !canSpeak || !text) return;
+  try{
+    if(!keepGoing) speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.86; u.pitch = 1.12; u.lang = "en-US";
+    if(voice) u.voice = voice;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function sayLines(lines){
+  if(!soundOn || !canSpeak) return;
+  shutUp();
+  lines.forEach(function(line){ say(line, true); });
+}
+
+/* =========================================================
+   4. LITTLE HELPERS
+   ========================================================= */
+function shuffle(a){
+  for(var i=a.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+var bannerTimer = null;
+function banner(text, good){
+  var el = $("banner");
+  el.textContent = text;
+  el.className = "show " + (good ? "good" : "bad");
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(function(){ el.className = ""; }, 1300);
+}
+var CONF_COLORS = ["#ffd34d","#5ce08b","#7ee0ff","#ff8ab5","#c3a0ff","#ffffff"];
+function confetti(x, y, count){
+  if(reduceMotion) return;
+  if(typeof document.body.animate !== "function") return;
+  for(var i=0;i<count;i++){
+    var d = document.createElement("div");
+    d.className = "conf";
+    d.style.left = x + "px"; d.style.top = y + "px";
+    d.style.background = CONF_COLORS[i % CONF_COLORS.length];
+    document.body.appendChild(d);
+    var ang = Math.random()*Math.PI*2, sp = 90 + Math.random()*260;
+    var dx = Math.cos(ang)*sp, dy = Math.sin(ang)*sp - 150;
+    (function(node){
+      var anim = node.animate(
+        [{transform:"translate(0,0) rotate(0deg)", opacity:1},
+         {transform:"translate("+dx.toFixed(1)+"px,"+(dy+380).toFixed(1)+"px) rotate("+(Math.random()*720-360).toFixed(0)+"deg)", opacity:0}],
+        {duration: 900 + Math.random()*600, easing:"cubic-bezier(.15,.6,.4,1)"}
+      );
+      anim.onfinish = function(){ if(node.parentNode) node.parentNode.removeChild(node); };
+      setTimeout(function(){ if(node.parentNode) node.parentNode.removeChild(node); }, 1800);
+    })(d);
+  }
+}
+function centerOf(node){
+  var r = node.getBoundingClientRect();
+  return {x: r.left + r.width/2, y: r.top + r.height/2};
+}
+
+/* =========================================================
+   5. THE ORBIT MAP (used by Explore and by Find It)
+   ========================================================= */
+var maps = [];
+
+function beltDots(){
+  var out = "", seed = 7;
+  function rnd(){ seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+  for(var i=0;i<70;i++){
+    var a = rnd() * Math.PI * 2;
+    var rr = 250 + rnd() * 30;
+    var x = 500 + Math.cos(a) * rr, y = 500 + Math.sin(a) * rr;
+    out += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (1.6 + rnd()*2.4).toFixed(1) + '"/>';
+  }
+  return out;
+}
+
+function buildMap(hostId, prefix, animated){
+  var host = $(hostId);
+  var parts = ['<svg class="mapsvg" viewBox="-30 -30 1060 1060" preserveAspectRatio="xMidYMid meet" role="group">'];
+
+  BODIES.forEach(function(b){
+    if(b.orbit > 0){
+      parts.push('<circle class="ring' + (b.kind === "dwarf" ? " ring-dwarf" : "") + '" cx="500" cy="500" r="' + b.orbit + '"/>');
+    }
+  });
+  parts.push('<g class="belt" id="' + prefix + '-belt">' + beltDots() + "</g>");
+
+  BODIES.forEach(function(b){
+    var hitR = Math.max(b.draw + 16, 38);
+    var art = planetSVG(b, b.draw, prefix + "-" + b.id);
+    var text = '<text class="plabel" y="' + (b.draw + 36) + '" text-anchor="middle">' + b.name + "</text>";
+    if(b.kind === "dwarf") text += '<text class="sublabel" y="' + (b.draw + 60) + '" text-anchor="middle">dwarf planet</text>';
+    var inner = art + text +
+      '<circle class="halo" r="' + (hitR + 6) + '"/>' +
+      '<circle class="hit" r="' + hitR + '" fill="transparent" stroke="transparent"/>';
+    var bodyG = '<g class="body" data-id="' + b.id + '" tabindex="0" role="button" aria-label="' + b.name + '">' + inner + "</g>";
+
+    if(b.orbit === 0){
+      parts.push('<g transform="translate(500,500)">' + bodyG + "</g>");
+    }else{
+      parts.push('<g class="rot" data-id="' + b.id + '"><g transform="translate(' + (500 + b.orbit) + ',500)"><g class="ctr">' + bodyG + "</g></g></g>");
+    }
+  });
+  parts.push("</svg>");
+  host.innerHTML = parts.join("");
+
+  var svg = host.querySelector(".mapsvg");
+  var nodes = [];
+  BODIES.forEach(function(b){
+    if(b.orbit === 0) return;
+    var rot = svg.querySelector('.rot[data-id="' + b.id + '"]');
+    nodes.push({ rot: rot, ctr: rot.querySelector(".ctr"), angle: b.start, speed: b.speed });
+  });
+  var map = {
+    host: host, svg: svg, nodes: nodes, animated: !!animated,
+    belt: $(prefix + "-belt"), beltAngle: 0,
+    screen: host.closest(".screen")
+  };
+  applyMap(map);
+  maps.push(map);
+  return map;
+}
+
+function applyMap(m){
+  m.nodes.forEach(function(n){
+    n.rot.setAttribute("transform", "rotate(" + n.angle.toFixed(2) + " 500 500)");
+    n.ctr.setAttribute("transform", "rotate(" + (-n.angle).toFixed(2) + ")");
+  });
+  if(m.belt) m.belt.setAttribute("transform", "rotate(" + m.beltAngle.toFixed(2) + " 500 500)");
+}
+
+var paused = reduceMotion, lastTs = 0;
+function frame(ts){
+  var dt = lastTs ? (ts - lastTs) / 1000 : 0;
+  lastTs = ts;
+  if(dt > 0.2) dt = 0.2;
+  if(!paused && dt > 0){
+    maps.forEach(function(m){
+      if(!m.animated) return;
+      if(m.screen && !m.screen.classList.contains("active")) return;
+      m.nodes.forEach(function(n){ n.angle = (n.angle + n.speed * dt) % 360; });
+      m.beltAngle = (m.beltAngle + 5 * dt) % 360;
+      applyMap(m);
+    });
+  }
+  requestAnimationFrame(frame);
+}
+
+/* Small planets are only a few pixels wide on a phone, so a tap does not
+   have to land on one: whichever planet is nearest the finger wins. */
+function nearestBody(map, x, y){
+  var list = map.svg.querySelectorAll(".body");
+  var best = null, bestD = Infinity;
+  for(var i=0;i<list.length;i++){
+    var hit = list[i].querySelector(".hit");
+    if(!hit) continue;
+    var r = hit.getBoundingClientRect();
+    var dx = x - (r.left + r.width/2), dy = y - (r.top + r.height/2);
+    var d = Math.sqrt(dx*dx + dy*dy);
+    var reach = Math.max(44, r.width/2 + 6);
+    if(d <= reach && d < bestD){ bestD = d; best = list[i]; }
+  }
+  return best;
+}
+
+function mapClicks(map, handler){
+  map.svg.addEventListener("click", function(e){
+    var g = (e.target.closest ? e.target.closest(".body") : null);
+    if(!g && typeof e.clientX === "number") g = nearestBody(map, e.clientX, e.clientY);
+    if(g) handler(g.getAttribute("data-id"), g, e);
+  });
+  map.svg.addEventListener("keydown", function(e){
+    if(e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+    var g = e.target.closest ? e.target.closest(".body") : null;
+    if(g){ e.preventDefault(); handler(g.getAttribute("data-id"), g, e); }
+  });
+}
+
+/* =========================================================
+   6. THE PLANET CARD
+   ========================================================= */
+var cardIndex = 0, cardOpen = false;
+
+function cardArtSVG(b){
+  var box = (b.id === "saturn") ? "-125 -80 250 160" : "-72 -72 144 144";
+  var r = (b.id === "saturn") ? 52 : 56;
+  return '<svg viewBox="' + box + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + b.name + '">' +
+         planetSVG(b, r, "card-" + b.id) + "</svg>";
+}
+
+function openCard(id){
+  var b = (typeof id === "number") ? BODIES[id] : byId[id];
+  if(!b) return;
+  cardIndex = b.index;
+
+  $("cardArt").innerHTML = cardArtSVG(b);
+  var badge = $("cardBadge");
+  badge.textContent = b.badge;
+  badge.className = "badge" + (b.kind === "dwarf" ? " dw" : "");
+  $("cardName").textContent = b.name;
+  $("cardPhon").textContent = b.phon;
+
+  var facts = $("cardFacts");
+  facts.innerHTML = "";
+  b.facts.forEach(function(f){
+    var btn = document.createElement("button");
+    btn.className = "fact";
+    btn.innerHTML = "<span>" + f + '</span><span class="spk" aria-hidden="true">&#128266;</span>';
+    btn.setAttribute("aria-label", "Read: " + f);
+    btn.addEventListener("click", function(){ say(f); });
+    facts.appendChild(btn);
+  });
+
+  $("cardWowText").textContent = b.wow;
+  $("cardMoons").textContent = b.moons;
+  $("cardSize").textContent = b.size;
+  $("cardTemp").textContent = b.temp;
+  $("cardTempDot").style.left = Math.round(b.tempLevel * 100) + "%";
+
+  $("sheet").classList.add("open");
+  $("scrim").classList.add("on");
+  $("sheet").scrollTop = 0;
+  cardOpen = true;
+  say(b.name);
+}
+function closeCard(){
+  $("sheet").classList.remove("open");
+  $("scrim").classList.remove("on");
+  cardOpen = false;
+  shutUp();
+}
+function stepCard(delta){
+  var n = (cardIndex + delta + BODIES.length) % BODIES.length;
+  sfxTap();
+  openCard(n);
+}
+
+$("cardClose").addEventListener("click", closeCard);
+$("scrim").addEventListener("click", closeCard);
+$("cardPrev").addEventListener("click", function(){ stepCard(-1); });
+$("cardNext").addEventListener("click", function(){ stepCard(1); });
+$("cardWow").addEventListener("click", function(){ say(BODIES[cardIndex].wow); });
+$("cardRead").addEventListener("click", function(){
+  var b = BODIES[cardIndex];
+  sayLines([b.name].concat(b.facts).concat([b.wow]));
+});
+document.addEventListener("keydown", function(e){
+  if(!cardOpen) return;
+  if(e.key === "Escape") closeCard();
+  else if(e.key === "ArrowRight") stepCard(1);
+  else if(e.key === "ArrowLeft") stepCard(-1);
+});
+
+/* =========================================================
+   7. LINE UP  (true relative sizes, so Jupiter really towers)
+   ========================================================= */
+var LINE_SCALE = 1, BALL_MAX = 200;
+
+function buildLineup(){
+  /* One pixel scale for everything, chosen so Jupiter fits the screen.
+     Every ball below is drawn at its true size next to that. */
+  BALL_MAX = Math.max(110, Math.min(230, Math.round(window.innerHeight * 0.34)));
+  LINE_SCALE = BALL_MAX / 142984;
+
+  var host = $("lineScroll");
+  host.innerHTML = "";
+
+  var slab = document.createElement("button");
+  slab.className = "sunSlab";
+  slab.style.height = (BALL_MAX + 10) + "px";
+  slab.setAttribute("aria-label", "The Sun, too big to fit");
+  var sunPx = Math.round(1391400 * LINE_SCALE);
+  slab.innerHTML = '<span class="sunBall" style="width:' + sunPx + "px;height:" + sunPx + 'px"></span>' +
+                   '<span class="cap">The Sun<br>too big<br>to fit!</span>';
+  slab.addEventListener("click", function(){ sfxTap(); openCard("sun"); });
+  host.appendChild(slab);
+
+  BODIES.forEach(function(b){
+    if(b.id === "sun") return;
+    var px = Math.max(3, b.km * LINE_SCALE);
+    var wide = (b.id === "saturn");          /* only Saturn needs room for rings */
+    var w = wide ? px * 2.3 : px;
+    var box = wide ? "-115 -50 230 100" : "-50 -50 100 100";
+
+    var cell = document.createElement("button");
+    cell.className = "lineCell" + (b.kind === "dwarf" ? " dwarf" : "");
+    cell.setAttribute("aria-label", b.name);
+
+    var ring = px < 14 ? '<span class="tinyRing" style="bottom:' + (px/2 - 17).toFixed(1) + 'px"></span>' : "";
+    var art = '<span class="lineBall" style="height:' + BALL_MAX + 'px">' + ring +
+              '<svg width="' + w.toFixed(1) + '" height="' + px.toFixed(1) + '" viewBox="' + box + '" style="overflow:visible">' +
+              planetSVG(b, 50, "line-" + b.id) + "</svg></span>";
+    var tag = b.mnemonic ? '<span class="mn">' + b.mnemonic + "</span>" : '<span class="dw">dwarf planet</span>';
+    cell.innerHTML = art + '<span class="nm">' + b.name + "</span>" + tag;
+    cell.addEventListener("click", function(){ sfxTap(); openCard(b.id); });
+    host.appendChild(cell);
+  });
+}
+
+var lineTimer = null;
+window.addEventListener("resize", function(){
+  clearTimeout(lineTimer);
+  lineTimer = setTimeout(function(){
+    buildLineup();
+    if(currentScreen === "order") orderRender();
+  }, 250);
+});
+
+/* =========================================================
+   8. GAME ONE: FIND IT!
+   ========================================================= */
+var findMap = null;
+var find = { queue: [], round: 0, tries: 0, stars: 0, locked: false, total: 8 };
+
+function findStart(){
+  find.queue = shuffle(BODIES.map(function(b){ return b.id; })).slice(0, find.total);
+  find.round = 0; find.stars = 0; find.locked = false;
+  $("findReward").classList.remove("on");
+  findAsk();
+}
+function findTarget(){ return byId[find.queue[find.round]]; }
+function findAsk(){
+  find.tries = 0; find.locked = false;
+  var b = findTarget();
+  var word = (b.id === "sun") ? "the Sun" : b.name;
+  $("findPrompt").innerHTML = "Find " + word + "! &#128266;";
+  $("findScore").textContent = (find.round + 1) + " / " + find.total;
+  if(findMap) findMap.svg.querySelectorAll(".body.hint").forEach(function(n){ n.classList.remove("hint"); });
+  say("Find " + word);
+}
+function findGuess(id, node, e){
+  if(find.locked) return;
+  var b = findTarget();
+  if(id === b.id){
+    find.locked = true;
+    if(find.tries === 0) find.stars++;
+    sfxGood();
+    node.classList.add("pop");
+    setTimeout(function(){ node.classList.remove("pop"); }, 500);
+    var p = e && e.clientX ? {x:e.clientX, y:e.clientY} : centerOf(node);
+    confetti(p.x, p.y, 26);
+    var word = (b.id === "sun") ? "the Sun" : b.name;
+    banner("Yes! " + word, true);
+    say("Yes! That is " + word);
+    setTimeout(function(){
+      find.round++;
+      if(find.round >= find.total) findWin(); else findAsk();
+    }, 1400);
+  }else{
+    find.tries++;
+    sfxBad();
+    node.classList.add("wrongwig");
+    setTimeout(function(){ node.classList.remove("wrongwig"); }, 460);
+    banner("Try again", false);
+    if(find.tries >= 2 && findMap){
+      var right = findMap.svg.querySelector('.body[data-id="' + b.id + '"]');
+      if(right) right.classList.add("hint");
+      say("Here is a hint. It is glowing.");
+    }else{
+      say("Not that one. Try again.");
+    }
+  }
+}
+function findWin(){
+  sfxWin();
+  var s = "";
+  for(var i=0;i<find.total;i++){ s += (i < find.stars) ? "⭐" : "☆"; }
+  $("findStars").textContent = s;
+  $("findMsg").textContent = find.stars === find.total
+    ? "You got every single one on the first try!"
+    : "You found all 8. You earned " + find.stars + " stars.";
+  $("findReward").classList.add("on");
+  confetti(window.innerWidth/2, window.innerHeight/2, 60);
+  say(find.stars === find.total ? "Wow! You got every one right!" : "You did it! You found all of them.");
+}
+$("findAgain").addEventListener("click", function(){ sfxTap(); findStart(); });
+$("findPrompt").addEventListener("click", function(){
+  var b = findTarget(); if(b) say("Find " + (b.id === "sun" ? "the Sun" : b.name));
+});
+$("btnLabels").addEventListener("click", function(){
+  var on = this.getAttribute("aria-pressed") === "true";
+  this.setAttribute("aria-pressed", on ? "false" : "true");
+  if(findMap) findMap.svg.classList.toggle("nolabels", on);
+});
+
+/* =========================================================
+   9. GAME TWO: IN ORDER
+   ========================================================= */
+var order = { placed: [], tray: [] };
+
+function orderStart(){
+  order.placed = [];
+  order.tray = shuffle(PLANET_ORDER.slice());
+  $("orderReward").classList.remove("on");
+  orderRender();
+}
+function isCompact(){ return window.innerHeight < 620; }
+
+function chipArt(b, size){
+  return '<svg width="' + (size*2.3) + '" height="' + size + '" viewBox="-115 -50 230 100" aria-hidden="true" style="overflow:visible">' +
+         planetSVG(b, 46, "chip-" + b.id) + "</svg>";
+}
+function orderRender(){
+  var compact = isCompact();
+  $("screen-order").classList.toggle("compact", compact);
+
+  /* Eight slots have to fit one row, on a small phone as well as a tablet. */
+  var wrapW = $("orderWrap").clientWidth || window.innerWidth;
+  var slotW = Math.max(30, Math.min(compact ? 52 : 74, Math.floor((wrapW - 20 - 6*7) / 8)));
+  var showName = !compact && slotW >= 62;
+  var slotH = showName ? 88 : Math.round(slotW * 1.25);
+  var slotArt = showName ? 28 : Math.round(slotW * 0.6);
+
+  var slots = $("orderSlots");
+  slots.innerHTML = "";
+  PLANET_ORDER.forEach(function(pid, i){
+    var d = document.createElement("div");
+    d.className = "slot";
+    d.style.width = slotW + "px";
+    d.style.height = slotH + "px";
+    if(i < order.placed.length){
+      var b = byId[order.placed[i]];
+      d.className += " filled";
+      d.innerHTML = chipArt(b, slotArt) + (showName ? '<span class="snm">' + b.name + "</span>" : "");
+      d.setAttribute("aria-label", (i+1) + ". " + b.name);
+    }else{
+      d.innerHTML = '<span class="num">' + (i+1) + "</span>";
+    }
+    slots.appendChild(d);
+  });
+
+  var tray = $("orderTray");
+  tray.innerHTML = "";
+  order.tray.forEach(function(pid){
+    var b = byId[pid];
+    var btn = document.createElement("button");
+    btn.className = "chip";
+    btn.setAttribute("data-id", pid);
+    btn.setAttribute("aria-label", b.name);
+    btn.innerHTML = chipArt(b, compact ? 26 : 40) + '<span class="cnm">' + b.name + "</span>";
+    btn.addEventListener("click", function(e){ orderTap(pid, btn, e); });
+    tray.appendChild(btn);
+  });
+}
+function orderTap(pid, node, e){
+  var need = PLANET_ORDER[order.placed.length];
+  if(pid === need){
+    sfxGood();
+    order.placed.push(pid);
+    order.tray = order.tray.filter(function(x){ return x !== pid; });
+    var p = e && e.clientX ? {x:e.clientX, y:e.clientY} : centerOf(node);
+    confetti(p.x, p.y, 14);
+    say(byId[pid].name);
+    orderRender();
+    if(order.placed.length === PLANET_ORDER.length) orderWin();
+  }else{
+    sfxBad();
+    node.classList.add("bad");
+    setTimeout(function(){ node.classList.remove("bad"); }, 480);
+    banner("Not yet!", false);
+    say("Not yet. Which one is closer to the Sun?");
+  }
+}
+function orderWin(){
+  sfxWin();
+  $("orderReward").classList.add("on");
+  confetti(window.innerWidth/2, window.innerHeight/2, 60);
+  sayLines(["You did it!","My Very Excellent Mother Just Served Us Nachos.","And way out past Neptune is Pluto!"]);
+}
+$("orderAgain").addEventListener("click", function(){ sfxTap(); orderStart(); });
+$("orderPrompt").addEventListener("click", function(){ say("Tap the planets in order, starting with the one closest to the Sun."); });
+
+/* =========================================================
+   10. SCREENS, BUTTONS, START UP
+   ========================================================= */
+var currentScreen = "explore";
+function showScreen(name){
+  currentScreen = name;
+  shutUp();
+  closeCard();
+  ["explore","lineup","find","order"].forEach(function(s){
+    $("screen-" + s).classList.toggle("active", s === name);
+  });
+  var navs = document.querySelectorAll(".navbtn");
+  for(var i=0;i<navs.length;i++){
+    navs[i].classList.toggle("active", navs[i].getAttribute("data-screen") === name);
+  }
+  $("btnPause").classList.toggle("hide", name !== "explore");
+  if(name === "find") findStart();
+  if(name === "order") orderStart();
+  if(name === "lineup") say("How big is each one?");
+}
+var navList = document.querySelectorAll(".navbtn");
+for(var i=0;i<navList.length;i++){
+  navList[i].addEventListener("click", function(){
+    sfxTap();
+    showScreen(this.getAttribute("data-screen"));
+  });
+}
+
+$("btnSound").addEventListener("click", function(){
+  soundOn = !soundOn;
+  this.setAttribute("aria-pressed", soundOn ? "true" : "false");
+  this.innerHTML = soundOn ? "&#128266;" : "&#128263;";
+  if(!soundOn) shutUp(); else { sfxTap(); say("Sound is on"); }
+});
+
+$("btnPause").addEventListener("click", function(){
+  paused = !paused;
+  this.setAttribute("aria-pressed", paused ? "true" : "false");
+  this.innerHTML = paused ? "&#9654;&#65039;" : "&#9208;&#65039;";
+  this.setAttribute("aria-label", paused ? "Play the orbits" : "Pause the orbits");
+  sfxTap();
+});
+if(paused){
+  $("btnPause").setAttribute("aria-pressed","true");
+  $("btnPause").innerHTML = "&#9654;&#65039;";
+}
+
+var fullEl = document.documentElement;
+if(!fullEl.requestFullscreen && !fullEl.webkitRequestFullscreen){
+  $("btnFull").classList.add("hide");
+}
+$("btnFull").addEventListener("click", function(){
+  sfxTap();
+  try{
+    if(document.fullscreenElement || document.webkitFullscreenElement){
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }else{
+      (fullEl.requestFullscreen || fullEl.webkitRequestFullscreen).call(fullEl);
+    }
+  }catch(e){}
+});
+
+function makeStars(){
+  var host = $("stars"), frag = document.createDocumentFragment();
+  for(var i=0;i<140;i++){
+    var s = document.createElement("div");
+    s.className = "star";
+    var size = Math.random() < 0.85 ? 1.7 : 3;
+    s.style.width = size + "px"; s.style.height = size + "px";
+    s.style.left = (Math.random()*100).toFixed(2) + "%";
+    s.style.top = (Math.random()*100).toFixed(2) + "%";
+    s.style.animationDelay = (Math.random()*4).toFixed(2) + "s";
+    s.style.opacity = (0.3 + Math.random()*0.6).toFixed(2);
+    frag.appendChild(s);
+  }
+  host.appendChild(frag);
+}
+
+/* ---- go ---- */
+makeStars();
+buildLineup();
+
+var exploreMap = buildMap("mapExplore", "ex", true);
+mapClicks(exploreMap, function(id, node){
+  sfxTap();
+  var hint = $("exploreHint");
+  if(hint) hint.classList.add("gone");
+  openCard(id);
+});
+
+findMap = buildMap("mapFind", "fd", false);
+mapClicks(findMap, findGuess);
+
+setTimeout(function(){
+  var h = $("exploreHint"); if(h) h.classList.add("gone");
+}, 9000);
+
+requestAnimationFrame(frame);
+
+/* Keep the page from scrolling around under little fingers. */
+document.addEventListener("touchmove", function(e){
+  var ok = e.target.closest && e.target.closest(".lineScroll, #sheet, .orderWrap");
+  if(!ok) e.preventDefault();
+}, {passive:false});
+
+window.addEventListener("pagehide", shutUp);
+})();
+</script>
+</body>
+</html>
